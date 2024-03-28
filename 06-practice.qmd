@@ -1,0 +1,77 @@
+---
+title: "Git and GitHub"
+format: html
+---
+
+```{r}
+#| label: setup
+library(tidyverse)
+```
+
+[London Lives Coroners' Inquests](https://github.com/sharonhoward/ll-coroners)
+
+```{r}
+#| label: import-data
+data_url <- "https://raw.githubusercontent.com/sharonhoward/ll-coroners/master/coroners_inquests/wa_coroners_inquests_v1-1.tsv"
+
+coroner <- read_tsv(data_url)
+```
+
+```{r}
+# Look at data
+coroner
+glimpse(coroner)
+
+# Look at the data
+coroner |> 
+  count(parish)
+
+coroner |> 
+  count(gender)
+
+coroner |> 
+  filter(gender == "u")
+
+coroner |> 
+  count(verdict)
+
+coroner |> 
+  count(cause_of_death, sort = TRUE)
+```
+
+```{r}
+# Tidy data
+
+# Simplify columns
+coroner <- select(coroner, doc_date:the_deceased, gender:deceased_additional_info)
+
+coroner <- coroner |> 
+  filter(gender != "u",
+         gender != "fm")
+
+coroner <- coroner |> 
+  filter(!is.na(parish))
+```
+
+```{r}
+# plot
+ggplot(data = coroner,
+       mapping = aes(y = parish, fill = gender)) + 
+  geom_bar()
+
+ggplot(data = coroner,
+       mapping = aes(y = fct_infreq(parish), fill = gender)) + 
+  geom_bar() + 
+  labs(y = "Parish", x = "Number of deaths",
+       title = "Number of Deaths by Parish, 18th century",
+       fill = "Gender")
+
+coroner |> 
+  mutate(gender = if_else(gender == "f", "Female", "Male")) |> 
+  ggplot(mapping = aes(y = fct_infreq(parish), fill = gender)) + 
+  geom_bar() + 
+  labs(y = "Parish", x = "Number of deaths",
+       title = "Number of Deaths by Parish, 18th century",
+       fill = "Gender")
+```
+

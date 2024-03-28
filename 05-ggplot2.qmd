@@ -1,0 +1,208 @@
+---
+title: "Visualization with ggplot2"
+format: html
+---
+
+```{r}
+#| label: setup
+library(palmerpenguins)
+library(tidyverse)
+
+penguins
+```
+
+
+## Practice data wrangling
+
+1. Remove rows based on one or more aspects of the data.
+2. Create a new column that shows flipper length in centimeters.
+3. How many penguins are there on each island?
+4. What is the average flipper length of each species?
+5. What is the average flipper length for each sex of each species?
+
+
+```{r}
+# 1. Remove rows
+penguins |> 
+  filter(year == 2007)
+
+filter(penguins, sex == "female")
+
+filter(penguins, bill_length_mm > 40)
+
+# 2. Create a new column
+penguins |> 
+  mutate(flipper_length_cm = flipper_length_mm / 10)
+
+# 3. How many penguins are there on each island?
+penguins |> 
+  group_by(island) |> 
+  summarize(count = n())
+
+penguins |> 
+  count(island)
+
+penguins |> 
+  summarise(count = n(), .by = island)
+
+# 4. What is the average flipper length of each species?
+penguins |> 
+  summarise(avg_flipper_mm = mean(flipper_length_mm), .by = species)
+
+penguins |> 
+  summarise(avg_flipper_mm = mean(flipper_length_mm, na.rm = TRUE),
+            .by = species)
+
+penguins |> 
+  filter(!is.na(flipper_length_mm)) |> 
+  summarise(avg_flipper_mm = mean(flipper_length_mm), .by = species)
+
+# 5. What is the average flipper length for each sex of each species?
+penguins |> 
+  filter(!is.na(sex),
+         !is.na(flipper_length_mm)) |> 
+  group_by(species, sex) |> 
+  summarise(avg_flipper_mm = mean(flipper_length_mm)) |> 
+  ungroup()
+
+penguins |> 
+  filter(!is.na(sex),
+         !is.na(flipper_length_mm)) |> 
+  summarise(avg_flipper_mm = mean(flipper_length_mm),
+            .by = c(sex, species))
+```
+
+
+## Visualization with ggplot2
+
+### Grammar of graphics
+1. Data
+2. Map data to aesthetics such as position, size, and color: `aes()`.
+3. Geometric shape used to represent the data: `geom_*()`.
+4. The statistical transformations applied to the data: `stat_*()`.
+5. The scales used for mapping the data to the aesthetic dimensions: `scale_*()`.
+6. Coordinate system for mapping the plane of the data: `coord_*()`
+7. Visual non-data components of the plot such as titles, labels, background, gridlines, and legends: `theme() or theme_*()`.
+
+## Building our first plot one layer at a time
+
+```{r}
+ggplot(data = penguins)
+
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g))
+
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point()
+
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g, color = species)) + 
+  geom_point()
+
+# Mapping vs setting
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(color = "orange")
+
+# Bad
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g, color = "orange")) + 
+  geom_point()
+
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g, color = species)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(mapping = aes(color = sex, shape = species)) + 
+  geom_smooth(method = "lm")
+
+
+penguins |> 
+  filter(!is.na(sex)) |> 
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(mapping = aes(color = sex, shape = species)) + 
+  geom_smooth(method = "lm")
+
+ggplot(data = filter(penguins, !is.na(sex)),
+       mapping = aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(mapping = aes(color = sex, shape = species)) + 
+  geom_smooth(method = "lm")
+```
+
+### Labels and scales
+
+```{r}
+ggplot(data = penguins,
+       mapping = aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(mapping = aes(color = species, shape = species)) + 
+  geom_smooth(method = "lm") + 
+  labs(title = "Body mass and flipper length",
+       subtitle = "For Adelie, Chinstrap, and Gentoo Penguins",
+       x = "Flipper length (mm)",
+       y = "Body mass (g)",
+       color = "Species", shape = "Species") + 
+  scale_color_brewer(type = "qual") + 
+  theme_light()
+```
+
+### Visualizing categorical variable
+
+```{r}
+ggplot(penguins, aes(x = species)) + 
+  geom_bar()
+
+ggplot(penguins, aes(y = species)) + 
+  geom_bar()
+
+ggplot(penguins, aes(x = species)) + 
+  geom_bar() + 
+  coord_flip()
+
+# Order bars by count
+ggplot(penguins, aes(x = fct_infreq(species))) + 
+  geom_bar()
+
+# Stat
+penguins |> 
+  count(species) |> 
+  ggplot(aes(x = species, y = n)) + 
+  geom_bar(stat = "identity")
+
+# geom_col
+penguins |> 
+  count(species) |> 
+  ggplot(aes(x = species, y = n)) + 
+  geom_col()
+
+ggplot(penguins, aes(x = island, fill = species)) + 
+  geom_bar()
+
+ggplot(penguins, aes(x = island, fill = species)) + 
+  geom_bar(position = "dodge")
+
+ggplot(penguins, aes(x = island, fill = species)) + 
+  geom_bar(position = position_dodge(preserve = "single")) + 
+  labs(y = NULL, x = "Island")
+
+ggplot(penguins, aes(x = island, fill = species)) + 
+  geom_bar(position = "fill")
+```
+
+## Facets
+
+```{r}
+penguins |> 
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(aes(color = island, shape = species))
+
+# Facet
+penguins |> 
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(aes(color = species, shape = species)) + 
+  facet_wrap(~island)
+```
+
