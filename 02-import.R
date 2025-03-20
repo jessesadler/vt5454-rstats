@@ -13,3 +13,10 @@ glimpse(interview)
 nrow(interviews)
 ncol(interviews)
 summary(interviews)
+
+villages <- interviews |> count(village)
+
+write_csv(villages,  "data/villages.csv")
+
+
+read_csv("data/villages.csv")

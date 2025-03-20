@@ -1,0 +1,309 @@
+---
+title: "Geospatial analysis"
+format: html
+---
+
+### Install vector packages
+
+```{r}
+#| eval: false
+install.packages("sf")
+install.packages("rnaturalearth")
+install.packages("tidygeocoder")
+```
+
+Load packages
+```{r}
+#| label: setup
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+library(tidygeocoder)
+```
+
+North Carolina
+
+```{r}
+nc <- st_read(system.file("shape/nc.shp", package = "sf"))
+
+nc
+
+st_crs(nc)
+st_geometry(nc)
+```
+
+Plotting
+
+```{r}
+plot(nc)
+
+nc |> 
+  select(BIR74) |> 
+  plot()
+```
+
+## Create a vector map
+1. Base map
+2. Geocode locations
+3. Create a map
+
+### 1. Base map
+
+Use `rnaturalearth` to get map of US
+
+```{r}
+states <- ne_download(type = "states")
+
+plot(st_geometry(states))
+
+glimpse(states)
+
+# Remove Alaska and Hawaii
+states <- states |> 
+  filter(name != "Hawaii", name != "Alaska") |> 
+  select(name)
+```
+
+Plot the base map
+
+```{r}
+# Base plot
+plot(states, graticule = TRUE, axes = TRUE)
+
+# ggplot
+ggplot(data = states) + 
+  geom_sf()
+
+ggplot(data = states) + 
+  geom_sf(aes(fill = name)) + 
+  guides(fill = "none") + 
+  theme_minimal()
+
+ggplot(data = states) + 
+  geom_sf(aes(fill = name)) + 
+  guides(fill = "none") + 
+  coord_sf(datum = NA) + # remove graticules
+  theme_minimal()
+```
+
+### 2. Geocoding
+
+Using `tidygeocoder`
+
+```{r}
+places <- c("Blacksburg", "Washington DC", "San Diego")
+
+places_geo <- geo(places)
+
+places_geo
+
+places_sf <- st_as_sf(places_geo, coords = c("long", "lat"),
+                      crs = 4326)
+places_sf
+```
+
+### 3. Make a map
+
+```{r}
+ggplot() + 
+  geom_sf(data = states, aes(fill = name)) + 
+  guides(fill = "none") + 
+  geom_sf(data = places_sf, size = 3) + 
+  geom_sf_text(data = places_sf, aes(label = address)) + 
+  theme_minimal()
+```
+
+### Transform CRS
+
+```{r}
+states_proj <- st_transform(states, crs = "ESRI:102004")
+places_proj <- st_transform(places_sf, crs = "ESRI:102004")
+
+ggplot() + 
+  geom_sf(data = states_proj, aes(fill = name)) + 
+  guides(fill = "none") + 
+  geom_sf(data = places_proj, size = 3) + 
+  geom_sf_text(data = places_proj, aes(label = address)) + 
+  theme_minimal()
+
+ggplot() + 
+  geom_sf(data = states_proj, aes(fill = name)) + 
+  guides(fill = "none") + 
+  geom_sf(data = places_proj, size = 3) + 
+  geom_sf_text(data = places_proj, aes(label = address)) + 
+  coord_sf(datum = st_crs("ESRI:102004")) + 
+  theme_minimal()
+
+ggplot() + 
+  geom_sf(data = states_proj, aes(fill = name)) + 
+  guides(fill = "none") + 
+  geom_sf(data = places_proj, size = 2) + 
+  geom_sf_text(data = places_proj, aes(label = address),
+               nudge_y = 70000) + 
+  theme_minimal()
+
+# Individual state
+ggplot() + 
+  geom_sf(data = states_proj |> filter(name == "Virginia")) + 
+  geom_sf(data = places_proj |> filter(address == "Blacksburg")) + 
+  geom_sf_text(data = places_proj |> filter(address == "Blacksburg"),
+               aes(label = address),
+               nudge_y = -30000) + 
+  theme_minimal()
+```
+
+## Raster data
+
+```{r}
+#| eval: false
+install.packages("terra")
+install.packages("elevatr")
+install.packages("tidyterra")
+install.packages("mapview")
+```
+
+```{r}
+#| label: load-packages
+library(terra)
+library(elevatr)
+library(tidyterra)
+library(mapview)
+```
+
+### Download the data with elevatr
+
+```{r}
+bbox <- tibble(
+  x = c(-80.6, -80.6, -80.1, -80.1),
+  y = c(37.1, 37.4, 37.1, 37.4)
+)
+
+bbox_sf <- st_as_sf(bbox, coords = c("x", "y"), crs = 4326)
+bbox_sf
+
+mapview(bbox_sf)
+
+elev_raster <- get_elev_raster(bbox_sf, z = 10)
+# Download is a raster object
+class(elev_raster)
+
+# Convert to terra object
+elev <- rast(elev_raster)
+
+elev
+```
+
+Plot
+
+```{r}
+# Base plotting
+plot(elev)
+contour(elev, color = "gray40", add = TRUE)
+
+# ggplot2 with tidyterra
+ggplot() + 
+  geom_spatraster(data = elev) + 
+  geom_sf(data = places_sf |> filter(address == "Blacksburg")) + 
+  scale_fill_gradientn(
+    colors = terrain.colors(25)
+  )
+
+ggplot() + 
+  geom_spatraster(data = elev) + 
+  geom_point(data = places_geo |> filter(address == "Blacksburg"),
+             aes(x = long, y = lat)) + 
+  scale_fill_gradientn(
+    colors = terrain.colors(25)
+  ) + 
+  theme_minimal()
+
+ggplot() + 
+  geom_spatraster(data = elev) + 
+  geom_point(data = places_geo |> filter(address == "Blacksburg"),
+             aes(x = long, y = lat)) + 
+  scale_fill_hypso_c(
+    palette = "arctic"
+  ) + 
+  theme_minimal()
+
+# Contours
+ggplot() + 
+  geom_spatraster_contour_filled(data = elev, bins = 8) + 
+  geom_spatraster_contour(data = elev, bins = 8) + 
+  scale_fill_wiki_d(direction = -1)
+
+ggplot() + 
+  geom_spatraster(data = elev) + 
+  geom_sf(data = places_sf |> filter(address == "Blacksburg")) + 
+  scale_fill_gradientn(
+    colors = gray.colors(20)
+  )
+```
+
+Rivers
+
+```{r}
+rivers <- ne_download(type = "rivers_north_america",
+                      category = "physical",
+                      scale = 10)
+
+ggplot() + 
+  geom_spatraster(data = elev) + 
+  geom_point(data = places_geo |> filter(address == "Blacksburg"),
+             aes(x = long, y = lat)) + 
+  geom_sf(data = rivers) + 
+  scale_fill_hypso_c(
+    palette = "arctic"
+  ) + 
+  coord_sf(xlim = c(-80.6, -80.1), ylim = c(37.1, 37.4)) + 
+  theme_minimal()
+```
+
+
+```{r}
+rivers <- rivers |> 
+  select(name, scalerank)
+
+rivers_small <- rivers_small |> 
+  select(name, scalerank)
+
+rivers_all <- bind_rows(rivers, rivers_small)
+
+rivers_nc <- st_intersection()
+
+ggplot() + 
+  geom_sf(data = nc) + 
+  geom_sf(data = nc_rivers)
+```
+
+```{r}
+coast <- ne_coastline(scale = 10)
+
+tbl_city <- tibble(
+  place = c("Blacksburg", "San Diego"),
+  state = c("Virginia", "California"),
+)
+
+tbl_county <- tibble(
+  place = c("Shelby County"),
+  state = "Kentucky"
+)
+
+tibble(
+  name = "Shelby County",
+  search_term = "County capital, state",
+)
+
+tbl_city_geo <- geocode(tbl_city, city = place, state = state)
+tb_county_geo <- geocode(tbl_county, county = place, state = state)
+
+places <- bind_rows(tbl_city, tbl_county)
+
+nc_rivers |> 
+  mutate(color = if_else(
+    name %in% c("river 1", "river2"),
+    "lightblue", "black"
+  ))
+
+```
+

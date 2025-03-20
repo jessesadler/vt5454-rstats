@@ -1,0 +1,121 @@
+---
+title: "Network analysis"
+format: html
+---
+
+## Nomenclature of networks
+- nodes: Points or entities
+- edges: Connections between the nodes
+
+```{r}
+#| eval: false
+install.packages("igraph")
+install.packages("tidygraph")
+install.packages("ggraph")
+```
+
+```{r}
+#| label: load-packages
+
+library(tidyverse)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+```
+
+Create some toy data
+
+```{r}
+people <- c("Jesse", "Kay", "Kylie", "Miles", "Julia", "Paige", "Bailey", "Hannah")
+
+set.seed(240)
+nodes <- tibble(name = people,
+                weight = sample(1:20, size = length(people)))
+nodes
+
+set.seed(240)
+edges <- tibble(
+  from = sample(people, 20, replace = TRUE),
+  to   = sample(people, 20, replace = TRUE)
+) |> 
+  filter(from != to)
+edges
+
+edges <- edges |> 
+  count(from, to)
+```
+
+### igraph
+
+```{r}
+net <- graph_from_data_frame(
+  d = edges,
+  vertices = nodes,
+  directed = FALSE
+)
+
+net
+set.seed(24)
+plot(net)
+
+plot(net, layout = layout_as_tree)
+plot(net, layout = layout_in_circle)
+plot(net, layout = layout_with_kk)
+```
+
+Working with igraph data
+
+```{r}
+E(net)
+V(net)
+
+betweenness(net)
+mean_distance(net)
+
+cluster_edge_betweenness(net)
+```
+
+## tidygraph and ggraph
+
+```{r}
+# Can create tbl_graph in two ways
+as_tbl_graph(net)
+tbl_graph(nodes = nodes, edges = edges, directed = FALSE)
+
+net_tbl <- as_tbl_graph(net)
+class(net_tbl)
+
+net_tbl |> 
+  activate(edges)
+```
+
+Calculate centrality
+```{r}
+net_tbl <- net_tbl |> 
+  mutate(centrality = centrality_betweenness())
+```
+
+### Plotting with ggraph
+
+```{r}
+ggraph(graph = net_tbl) + 
+  geom_node_point() + 
+  geom_edge_link()
+
+ggraph(graph = net_tbl) + 
+  geom_node_point() + 
+  geom_edge_fan()
+
+ggraph(graph = net_tbl, layout = "fr") + 
+  geom_node_point(aes(size = centrality)) + 
+  geom_edge_fan()
+```
+
+Data
+
+```{r}
+whigs <- graph_from_biadjacency_matrix(whigs)
+
+plot(whigs, vertex.label = NA, vertex.size = 5)
+```
+
